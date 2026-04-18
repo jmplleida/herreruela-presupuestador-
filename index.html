@@ -423,28 +423,53 @@ function voz(fieldId, btnEl) {
   recog.start();
 }
 
-// ===================== VOZ — NÚMEROS DIRECTO (sin querySelector) =====================
+// ===================== HELPER: listener de voz compatible iOS/Android/PC =====================
+function addVozListener(btn, fn) {
+  let touched = false;
+  btn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    touched = true;
+    fn();
+    setTimeout(function(){ touched = false; }, 600);
+  }, { passive: false });
+  btn.addEventListener('click', function() {
+    if (!touched) fn();
+  });
+}
+
+// ===================== VOZ — NÚMEROS DIRECTO =====================
+let vozTarget = null; // referencia global al input activo
+
 function vozNumDirect(id, field, inputEl, btnEl) {
-  if (!SR) { showToast('Voz no disponible en este navegador'); return; }
-  if (recog) { recog.stop(); recog = null; }
+  if (!SR) { alert('Reconocimiento de voz no disponible'); return; }
+  if (recog) { try { recog.abort(); } catch(e){} recog = null; }
   if (btnEl) btnEl.classList.add('on');
   setVozUI(true, 'Di el número...');
+
   recog = new SR();
-  recog.lang = 'es-ES'; recog.interimResults = false; recog.continuous = false;
-  recog.onresult = e => {
+  recog.lang = 'es-ES';
+  recog.interimResults = false;
+  recog.continuous = false;
+  recog.maxAlternatives = 1;
+
+  recog.onresult = function(e) {
     const raw = e.results[0][0].transcript.trim();
-    showToast('Escuché: "' + raw + '"');
-    let num = textoANumero(raw);
+    alert('Escuché: ' + raw); // diagnóstico temporal
+    const num = textoANumero(raw);
     inputEl.value = num;
     const p = parts.find(x => x.id === id);
     if (p) { p[field] = num; updSub(id); }
-    setTimeout(() => showToast(field === 'q' ? '✓ Cantidad: ' + num : '✓ Precio: ' + num + ' €'), 900);
+    showToast((field === 'q' ? 'Cantidad: ' : 'Precio: ') + num);
   };
-  recog.onerror = e => {
-    const msgs = { 'not-allowed': 'Permiso de micrófono denegado', 'no-speech': 'No se detectó voz', 'network': 'Error de red' };
-    showToast(msgs[e.error] || 'No se entendió');
+  recog.onerror = function(e) {
+    const msgs = { 'not-allowed':'Permiso denegado', 'no-speech':'No se oyó nada', 'network':'Error de red' };
+    showToast(msgs[e.error] || 'Error: ' + e.error);
   };
-  recog.onend = () => { if (btnEl) btnEl.classList.remove('on'); setVozUI(false); recog = null; };
+  recog.onend = function() {
+    if (btnEl) btnEl.classList.remove('on');
+    setVozUI(false);
+    recog = null;
+  };
   recog.start();
 }
 
@@ -557,24 +582,23 @@ function render() {
     const grid = document.createElement('div'); grid.className = 'pgrid';
 
     // Celda cantidad
+    // Celda cantidad: 🎤 | Cant. | input
     const cell1 = document.createElement('div'); cell1.className = 'pgrid-cell';
+    const btnQ = document.createElement('button'); btnQ.className = 'mic-sm'; btnQ.title = 'Dictar cantidad'; btnQ.innerHTML = MIC_SVG;
     const lbl1 = document.createElement('span'); lbl1.className = 'pgrid-lbl'; lbl1.textContent = 'Cant.';
     const inpQ = document.createElement('input'); inpQ.className = 'pinp'; inpQ.type = 'number'; inpQ.min = '0'; inpQ.step = '0.1'; inpQ.placeholder = p.u; inpQ.value = p.q || '';
     inpQ.addEventListener('input', function(){ updP(p.id,'q',this.value); });
-    const btnQ = document.createElement('button'); btnQ.className = 'mic-sm'; btnQ.title = 'Dictar cantidad'; btnQ.innerHTML = MIC_SVG;
-    btnQ.addEventListener('touchend', function(e){ e.preventDefault(); vozNumDirect(p.id, 'q', inpQ, this); });
-    btnQ.addEventListener('click', function(e){ vozNumDirect(p.id, 'q', inpQ, this); });
-    cell1.appendChild(lbl1); cell1.appendChild(inpQ); cell1.appendChild(btnQ);
+    addVozListener(btnQ, function(){ vozNumDirect(p.id, 'q', inpQ, btnQ); });
+    cell1.appendChild(btnQ); cell1.appendChild(lbl1); cell1.appendChild(inpQ);
 
-    // Celda precio
+    // Celda precio: 🎤 | Precio | input
     const cell2 = document.createElement('div'); cell2.className = 'pgrid-cell';
+    const btnP = document.createElement('button'); btnP.className = 'mic-sm'; btnP.title = 'Dictar precio'; btnP.innerHTML = MIC_SVG;
     const lbl2 = document.createElement('span'); lbl2.className = 'pgrid-lbl'; lbl2.textContent = 'Precio';
     const inpP = document.createElement('input'); inpP.className = 'pinp'; inpP.type = 'number'; inpP.min = '0'; inpP.step = '0.01'; inpP.placeholder = '€/'+p.u; inpP.value = p.p || '';
     inpP.addEventListener('input', function(){ updP(p.id,'p',this.value); });
-    const btnP = document.createElement('button'); btnP.className = 'mic-sm'; btnP.title = 'Dictar precio'; btnP.innerHTML = MIC_SVG;
-    btnP.addEventListener('touchend', function(e){ e.preventDefault(); vozNumDirect(p.id, 'p', inpP, this); });
-    btnP.addEventListener('click', function(e){ vozNumDirect(p.id, 'p', inpP, this); });
-    cell2.appendChild(lbl2); cell2.appendChild(inpP); cell2.appendChild(btnP);
+    addVozListener(btnP, function(){ vozNumDirect(p.id, 'p', inpP, btnP); });
+    cell2.appendChild(btnP); cell2.appendChild(lbl2); cell2.appendChild(inpP);
 
     grid.appendChild(cell1); grid.appendChild(cell2);
 
