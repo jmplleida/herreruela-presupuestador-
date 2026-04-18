@@ -248,7 +248,7 @@
   <div class="card">
     <div class="frow">
       <input class="finp" id="f-cliente" placeholder="Nombre del cliente" type="text">
-      <button class="mic" onclick="voz('f-cliente')" title="Dictar nombre">
+      <button class="mic" onclick="voz('f-cliente',this)" title="Dictar nombre">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10a7 7 0 0014 0"/>
@@ -259,7 +259,7 @@
     </div>
     <div class="frow">
       <input class="finp" id="f-obra" placeholder="Dirección / descripción de la obra" type="text">
-      <button class="mic" onclick="voz('f-obra')" title="Dictar dirección">
+      <button class="mic" onclick="voz('f-obra',this)" title="Dictar dirección">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10a7 7 0 0014 0"/>
@@ -270,7 +270,7 @@
     </div>
     <div class="frow">
       <input class="finp" id="f-fecha" placeholder="Fecha" type="text">
-      <button class="mic" onclick="voz('f-fecha')" title="Dictar fecha">
+      <button class="mic" onclick="voz('f-fecha',this)" title="Dictar fecha">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10a7 7 0 0014 0"/>
@@ -281,7 +281,7 @@
     </div>
     <div class="frow">
       <input class="finp" id="f-obs" placeholder="Observaciones (opcional)" type="text">
-      <button class="mic" onclick="voz('f-obs')" title="Dictar observaciones">
+      <button class="mic" onclick="voz('f-obs',this)" title="Dictar observaciones">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10a7 7 0 0014 0"/>
@@ -397,13 +397,14 @@ function setVozUI(on, msg) {
   document.getElementById('vtxt').textContent = on ? msg : 'Voz';
 }
 
-// ===================== VOZ — TEXTO =====================
-function voz(fieldId) {
+// ===================== VOZ — TEXTO (compatible móvil) =====================
+function voz(fieldId, btnEl) {
   if (!SR) { showToast('Voz no disponible en este navegador'); return; }
+  const btn = btnEl || (typeof event !== 'undefined' && event.currentTarget);
   if (recog) { recog.stop(); recog = null; }
-  const btn = event.currentTarget;
   if (activeBtn && activeBtn !== btn) activeBtn.classList.remove('on');
-  activeBtn = btn; btn.classList.add('on');
+  activeBtn = btn;
+  if (btn) btn.classList.add('on');
   setVozUI(true, 'Escuchando...');
   recog = new SR();
   recog.lang = 'es-ES'; recog.interimResults = false; recog.continuous = false;
@@ -413,32 +414,48 @@ function voz(fieldId) {
     showToast('✓ "' + txt + '"');
     calc();
   };
-  recog.onerror = () => showToast('No se entendió, intenta de nuevo');
-  recog.onend = () => { btn.classList.remove('on'); setVozUI(false); recog = null; activeBtn = null; };
+  recog.onerror = e => {
+    const msgs = { 'not-allowed': 'Permiso de micrófono denegado', 'no-speech': 'No se detectó voz', 'network': 'Error de red' };
+    showToast(msgs[e.error] || 'No se entendió, intenta de nuevo');
+  };
+  recog.onend = () => { if (btn) btn.classList.remove('on'); setVozUI(false); recog = null; activeBtn = null; };
   recog.start();
 }
 
-// ===================== VOZ — NÚMEROS =====================
-function vozNum(id, field) {
-  if (!SR) { showToast('Voz no disponible'); return; }
+// ===================== VOZ — NÚMEROS (compatible móvil) =====================
+function vozNum(id, field, btnEl) {
+  if (!SR) { showToast('Voz no disponible en este navegador'); return; }
+  // Obtener botón: parámetro directo o event.currentTarget como fallback
+  const btn = btnEl || (typeof event !== 'undefined' && event.currentTarget) || document.getElementById('mic-' + id + '-' + field);
   if (recog) { recog.stop(); recog = null; }
-  const btn = event.currentTarget;
-  btn.classList.add('on');
+  if (btn) btn.classList.add('on');
   setVozUI(true, 'Di el número...');
   recog = new SR();
   recog.lang = 'es-ES'; recog.interimResults = false; recog.continuous = false;
   recog.onresult = e => {
     let raw = e.results[0][0].transcript;
-    raw = raw.replace(/\s/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
-    const num = parseFloat(raw) || 0;
+    // Admitir números hablados: "quince", "8,5", "12.5"
+    raw = raw.trim().toLowerCase();
+    // Intentar parsear número hablado en español
+    const palabras = {'cero':0,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,'trece':13,'catorce':14,'quince':15,'veinte':20,'treinta':30,'cuarenta':40,'cincuenta':50,'sesenta':60,'setenta':70,'ochenta':80,'noventa':90,'cien':100};
+    let num = 0;
+    if (palabras[raw] !== undefined) {
+      num = palabras[raw];
+    } else {
+      raw = raw.replace(/\s/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+      num = parseFloat(raw) || 0;
+    }
     const inp = document.querySelector('[data-id="' + id + '"][data-field="' + field + '"]');
     if (inp) inp.value = num;
     const p = parts.find(x => x.id === id);
     if (p) { p[field] = num; updSub(id); }
     showToast(field === 'q' ? '✓ Cantidad: ' + num : '✓ Precio: ' + num + ' €');
   };
-  recog.onerror = () => showToast('No se entendió');
-  recog.onend = () => { btn.classList.remove('on'); setVozUI(false); recog = null; };
+  recog.onerror = e => {
+    const msgs = { 'not-allowed': 'Permiso de micrófono denegado', 'no-speech': 'No se detectó voz', 'network': 'Error de red' };
+    showToast(msgs[e.error] || 'No se entendió, intenta de nuevo');
+  };
+  recog.onend = () => { if (btn) btn.classList.remove('on'); setVozUI(false); recog = null; };
   recog.start();
 }
 
@@ -481,14 +498,14 @@ function render() {
               placeholder="${p.u}" value="${p.q || ''}"
               data-id="${p.id}" data-field="q"
               oninput="updP(${p.id},'q',this.value)">
-            <button class="mic-sm" onclick="vozNum(${p.id},'q')" title="Dictar cantidad">${MIC_SVG}</button>
+            <button class="mic-sm" id="mic-${p.id}-q" onclick="vozNum(${p.id},'q',this)" title="Dictar cantidad">${MIC_SVG}</button>
           </div>
           <div class="pgrid-cell">
             <input class="pinp" type="number" min="0" step="0.01"
               placeholder="€/${p.u}" value="${p.p || ''}"
               data-id="${p.id}" data-field="p"
               oninput="updP(${p.id},'p',this.value)">
-            <button class="mic-sm" onclick="vozNum(${p.id},'p')" title="Dictar precio">${MIC_SVG}</button>
+            <button class="mic-sm" id="mic-${p.id}-p" onclick="vozNum(${p.id},'p',this)" title="Dictar precio">${MIC_SVG}</button>
           </div>
         </div>
         <div class="psub" id="sub-${p.id}">Subtotal: <strong>${fmt(p.q * p.p)}</strong></div>
