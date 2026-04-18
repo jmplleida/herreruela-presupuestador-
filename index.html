@@ -488,29 +488,43 @@ function render() {
   const list = document.getElementById('lista'); list.innerHTML = '';
   parts.forEach(p => {
     const d = document.createElement('div'); d.className = 'pitem';
-    d.innerHTML = `
-      <div class="pico">${p.i}</div>
-      <div class="pbody">
-        <div class="pname">${p.n}</div>
-        <div class="pgrid">
-          <div class="pgrid-cell">
-            <input class="pinp" type="number" min="0" step="0.1"
-              placeholder="${p.u}" value="${p.q || ''}"
-              data-id="${p.id}" data-field="q"
-              oninput="updP(${p.id},'q',this.value)">
-            <button class="mic-sm" id="mic-${p.id}-q" onclick="vozNum(${p.id},'q',this)" title="Dictar cantidad">${MIC_SVG}</button>
-          </div>
-          <div class="pgrid-cell">
-            <input class="pinp" type="number" min="0" step="0.01"
-              placeholder="€/${p.u}" value="${p.p || ''}"
-              data-id="${p.id}" data-field="p"
-              oninput="updP(${p.id},'p',this.value)">
-            <button class="mic-sm" id="mic-${p.id}-p" onclick="vozNum(${p.id},'p',this)" title="Dictar precio">${MIC_SVG}</button>
-          </div>
-        </div>
-        <div class="psub" id="sub-${p.id}">Subtotal: <strong>${fmt(p.q * p.p)}</strong></div>
-      </div>
-      <button class="del" onclick="delP(${p.id})">✕</button>`;
+
+    // Crear elementos manualmente para máxima compatibilidad Android
+    const ico = document.createElement('div'); ico.className = 'pico'; ico.textContent = p.i;
+
+    const body = document.createElement('div'); body.className = 'pbody';
+    const name = document.createElement('div'); name.className = 'pname'; name.textContent = p.n;
+
+    const grid = document.createElement('div'); grid.className = 'pgrid';
+
+    // Celda cantidad
+    const cell1 = document.createElement('div'); cell1.className = 'pgrid-cell';
+    const inpQ = document.createElement('input'); inpQ.className = 'pinp'; inpQ.type = 'number'; inpQ.min = '0'; inpQ.step = '0.1'; inpQ.placeholder = p.u; inpQ.value = p.q || ''; inpQ.dataset.id = p.id; inpQ.dataset.field = 'q';
+    inpQ.addEventListener('input', function(){ updP(p.id,'q',this.value); });
+    const btnQ = document.createElement('button'); btnQ.className = 'mic-sm'; btnQ.title = 'Dictar cantidad'; btnQ.innerHTML = MIC_SVG;
+    btnQ.addEventListener('touchend', function(e){ e.preventDefault(); vozNum(p.id,'q',this); });
+    btnQ.addEventListener('click', function(){ vozNum(p.id,'q',this); });
+    cell1.appendChild(inpQ); cell1.appendChild(btnQ);
+
+    // Celda precio
+    const cell2 = document.createElement('div'); cell2.className = 'pgrid-cell';
+    const inpP = document.createElement('input'); inpP.className = 'pinp'; inpP.type = 'number'; inpP.min = '0'; inpP.step = '0.01'; inpP.placeholder = '€/'+p.u; inpP.value = p.p || ''; inpP.dataset.id = p.id; inpP.dataset.field = 'p';
+    inpP.addEventListener('input', function(){ updP(p.id,'p',this.value); });
+    const btnP = document.createElement('button'); btnP.className = 'mic-sm'; btnP.title = 'Dictar precio'; btnP.innerHTML = MIC_SVG;
+    btnP.addEventListener('touchend', function(e){ e.preventDefault(); vozNum(p.id,'p',this); });
+    btnP.addEventListener('click', function(){ vozNum(p.id,'p',this); });
+    cell2.appendChild(inpP); cell2.appendChild(btnP);
+
+    grid.appendChild(cell1); grid.appendChild(cell2);
+
+    const sub = document.createElement('div'); sub.className = 'psub'; sub.id = 'sub-'+p.id;
+    sub.innerHTML = 'Subtotal: <strong>' + fmt(p.q * p.p) + '</strong>';
+    body.appendChild(name); body.appendChild(grid); body.appendChild(sub);
+
+    const delBtn = document.createElement('button'); delBtn.className = 'del'; delBtn.textContent = '✕';
+    delBtn.addEventListener('click', function(){ delP(p.id); });
+
+    d.appendChild(ico); d.appendChild(body); d.appendChild(delBtn);
     list.appendChild(d);
   });
   document.getElementById('badge-n').textContent = parts.length;
