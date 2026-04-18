@@ -95,13 +95,7 @@
     }
     .mic:active { transform: scale(0.92); }
     .mic.on { background: var(--h); color: #fff; animation: pm 1.2s infinite; }
-    .mic-sm {
-      width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
-      background: var(--hl); color: var(--h);
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      transition: background 0.18s;
-    }
-    .mic-sm.on { background: var(--h); color: #fff; }
+    .mic-sm.on { background: var(--h) !important; color: #fff !important; }
     @keyframes pm { 0%,100%{box-shadow:0 0 0 0 rgba(110,62,181,0.35);} 60%{box-shadow:0 0 0 9px rgba(110,62,181,0);} }
 
     /* PARTIDAS */
@@ -118,12 +112,18 @@
     }
     .pbody { flex: 1; min-width: 0; }
     .pname { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
-    .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .pgrid-cell { display: flex; gap: 4px; align-items: center; }
+    .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .pgrid-cell { display: flex; gap: 3px; align-items: center; min-width: 0; }
     .pinp {
-      flex: 1; font-size: 13px; padding: 7px 9px;
+      flex: 1; min-width: 0; width: 100%; font-size: 13px; padding: 7px 6px;
       border-radius: var(--rs); border: 0.5px solid var(--brd2);
       background: var(--surf2); color: var(--txt);
+    }
+    .mic-sm {
+      width: 26px !important; height: 26px !important; min-width: 26px;
+      border-radius: 50%; border: none; cursor: pointer;
+      background: var(--hl); color: var(--h);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .pinp:focus { outline: none; border-color: var(--h); }
     .psub { font-size: 12px; color: var(--muted); margin-top: 5px; }
@@ -433,23 +433,28 @@ function vozNum(id, field, btnEl) {
   recog = new SR();
   recog.lang = 'es-ES'; recog.interimResults = false; recog.continuous = false;
   recog.onresult = e => {
-    let raw = e.results[0][0].transcript;
-    // Admitir números hablados: "quince", "8,5", "12.5"
-    raw = raw.trim().toLowerCase();
-    // Intentar parsear número hablado en español
-    const palabras = {'cero':0,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,'trece':13,'catorce':14,'quince':15,'veinte':20,'treinta':30,'cuarenta':40,'cincuenta':50,'sesenta':60,'setenta':70,'ochenta':80,'noventa':90,'cien':100};
+    let raw = e.results[0][0].transcript.trim();
+    showToast('Escuché: "' + raw + '"');
+    // Convertir texto a número
     let num = 0;
-    if (palabras[raw] !== undefined) {
-      num = palabras[raw];
+    // 1. Palabras en español
+    const pal = {'cero':0,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,'trece':13,'catorce':14,'quince':15,'dieciséis':16,'dieciseis':16,'diecisiete':17,'dieciocho':18,'diecinueve':19,'veinte':20,'veintiuno':21,'veintidós':22,'veintidos':22,'veintitrés':23,'veintitres':23,'veinticuatro':24,'veinticinco':25,'treinta':30,'cuarenta':40,'cincuenta':50,'sesenta':60,'setenta':70,'ochenta':80,'noventa':90,'cien':100,'ciento':100,'doscientos':200,'trescientos':300,'cuatrocientos':400,'quinientos':500};
+    const key = raw.toLowerCase().trim();
+    if (pal[key] !== undefined) {
+      num = pal[key];
     } else {
-      raw = raw.replace(/\s/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
-      num = parseFloat(raw) || 0;
+      // 2. Número directo: "12", "8,5", "12.5", "doce coma cinco"
+      let clean = raw.toLowerCase()
+        .replace(' coma ', '.').replace(' punto ', '.')
+        .replace(',', '.').replace(/[^0-9.]/g, '');
+      num = parseFloat(clean);
+      if (isNaN(num)) num = 0;
     }
     const inp = document.querySelector('[data-id="' + id + '"][data-field="' + field + '"]');
-    if (inp) inp.value = num;
+    if (inp) { inp.value = num; inp.dispatchEvent(new Event('input')); }
     const p = parts.find(x => x.id === id);
     if (p) { p[field] = num; updSub(id); }
-    showToast(field === 'q' ? '✓ Cantidad: ' + num : '✓ Precio: ' + num + ' €');
+    setTimeout(() => showToast(field === 'q' ? '✓ Cantidad: ' + num : '✓ Precio: ' + num + ' €'), 800);
   };
   recog.onerror = e => {
     const msgs = { 'not-allowed': 'Permiso de micrófono denegado', 'no-speech': 'No se detectó voz', 'network': 'Error de red' };
